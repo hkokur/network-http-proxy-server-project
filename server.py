@@ -1,10 +1,15 @@
-import socket, threading
+import socket, threading, argparse
 
 # Check active ip addresses on your local machine by:
 # MacOs/Linux: ifconfig
 # Windows: ipconfig 
 HOST = "127.0.0.1"
-PORT = 8080
+PORT = 8080 # Default port number
+
+parser = argparse.ArgumentParser()
+parser.add_argument("port", type=int, help="Port number")
+args = parser.parse_args()
+PORT = args.port
 
 def handle_client(client_socket, address):
     print(f"New connection from {address}")
