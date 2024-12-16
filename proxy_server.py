@@ -22,9 +22,7 @@ def proxy_server():
                     handle_client(client_socket)
                 except Exception as e:
                     print(f"Error during client handling: {e}")
-        
-        except OSError as e:
-            print(f"OS Error: {e}")
+
         except KeyboardInterrupt:
             print("\nShutting down the proxy server.")
         except Exception as e:
@@ -42,11 +40,12 @@ def handle_client(client_socket):
 
         client_socket.sendall(response.encode('utf-8'))
     
+    except KeyboardInterrupt:
+        print("\nShutting down the proxy server.")
     except Exception as e:
         print(f"Error handling client: {e}")
     
     finally:
-        # Close the client connection
         client_socket.close()
 
 proxy_server()
