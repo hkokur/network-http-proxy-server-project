@@ -5,6 +5,8 @@ import socket, threading, argparse
 # Windows: ipconfig
 HOST = "127.0.0.1"
 PORT = 8080  # Default port number
+BASE_SENTENCE = "Hello,World!"
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("port", type=int, help="Port number")
@@ -28,7 +30,16 @@ def handle_client(client_socket, address):
 
         # Handle the response based on validation
         if is_valid:
-            response = f"HTTP/1.1 200 OK\r\n\r\nDocument size: {result} bytes"
+            # Generate the HTML page
+            document_size = result
+            html_content = generate_html_page(document_size)
+            response = (
+                f"HTTP/1.1 200 OK\r\n"
+                f"Content-Type: text/html\r\n"
+                f"Content-Length: {document_size}\r\n"
+                f"\r\n"
+                f"{html_content}"
+            )
         else:
             response = f"HTTP/1.1 {result}\r\n\r\n{result.split(':', 1)[1].strip()}"
 
@@ -47,7 +58,11 @@ def parse_and_validate_uri(request_line):
         print(parts)
 
         # Check if the URI format is valid
-        if len(parts) < 2 or not parts[1].startswith("/") or not parts[1][1:].isdigit():
+        if (
+            len(parts) != 3
+            or not parts[1].startswith("/")
+            or not parts[1][1:].isdigit()
+        ):
             return False, "400 Bad Request: Malformed or invalid URI"
 
         # Convert to int and control the size range
@@ -64,6 +79,27 @@ def parse_and_validate_uri(request_line):
 
     except Exception as e:
         return False, f"400 Bad Request: {str(e)}"
+
+
+def generate_html_page(document_size):
+    head = f"<HEAD><TITLE>I am {document_size} bytes long</TITLE></HEAD>"
+    body_start = "<BODY>"
+    body_end = "</BODY>"
+
+    # Calculate the remaining size needed for the body content
+    fixed_size = (
+        len("<HTML>") + len(head) + len(body_start) + len(body_end) + len("</HTML>")
+    )
+    remaining_size = document_size - fixed_size
+
+    # Generate the body content
+    body_content = BASE_SENTENCE * ((remaining_size // len(BASE_SENTENCE)))
+    body_content += BASE_SENTENCE[: remaining_size % len(BASE_SENTENCE)]
+    body = f"{body_start}{body_content}{body_end}"
+
+    response_html = f"<HTML>{head}{body}</HTML>"
+    # print(f"Generated HTML page of size {len(response_html)} bytes")
+    return response_html
 
 
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
