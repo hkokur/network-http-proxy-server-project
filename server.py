@@ -7,6 +7,7 @@ HOST = "127.0.0.1"
 PORT = 8080  # Default port number
 BASE_SENTENCE = "Hello,World!"
 
+
 parser = argparse.ArgumentParser()
 parser.add_argument("port", type=int, help="Port number")
 args = parser.parse_args()
@@ -54,6 +55,7 @@ def parse_and_validate_uri(request_line):
     try:
         # Get the URI
         parts = request_line.split()
+        print(parts)
 
         # Check if the URI format is valid
         if (
@@ -67,6 +69,10 @@ def parse_and_validate_uri(request_line):
         document_size = int(parts[1][1:])
         if not (100 <= document_size <= 20000):
             return False, "400 Bad Request: Size out of range"
+
+        # check the GET method
+        if parts[0] != "GET":
+            return False, "510 Not Implemented: Only GET method is supported"
 
         # If valid, return the size
         return True, document_size
