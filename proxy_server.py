@@ -1,13 +1,14 @@
 import socket
 import threading
 import signal
+from urllib.parse import urlparse
 
 # Check active IP addresses on your local machine by:
 # MacOS/Linux: ifconfig
 # Windows: ipconfig
 HOST = "127.0.0.1"
 PORT = 8888  # Default port number
-WEB_SERVER_PORT = 8000
+WEB_SERVER_PORT = 8080
 
 signal.signal(signal.SIGTSTP, signal.SIG_IGN)
 
@@ -99,10 +100,29 @@ def send_request_to_web_server(request):
         is_valid, response = parse_and_validate_uri(request_line)
         if not is_valid:
             return f"HTTP/1.1 {response}\r\n\r\n{response.split(':', 1)[1].strip()}"
+        
+        # Extract and adjust the Host header
+        parsed_url = urlparse(request_line.split(' ')[1])  # Get the absolute URI from the request line
+        web_server_host = parsed_url.hostname or "127.0.0.1"
+        web_server_port = parsed_url.port or WEB_SERVER_PORT
+        relative_path = parsed_url.path or "/"
+
+        # Reconstruct the request with the modified Host header
+        modified_request_lines = []
+        for line in request.splitlines():
+            if line.lower().startswith("host:"):
+                modified_request_lines.append(f"Host: {web_server_host}:{web_server_port}")
+            elif line == request_line:
+                # Replace absolute URI with relative path in the request line
+                modified_request_lines.append(f"{request_line.split(' ')[0]} {relative_path} {request_line.split(' ')[2]}")
+            else:
+                modified_request_lines.append(line)
+        modified_request = "\r\n".join(modified_request_lines) + "\r\n\r\n"
+
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
                 server_socket.connect(("127.0.0.1", WEB_SERVER_PORT))
-                server_socket.sendall(request.encode("utf-8"))
+                server_socket.sendall(modified_request.encode("utf-8"))
                 response = server_socket.recv(1024).decode("utf-8")
                 return response
         except ConnectionRefusedError:
