@@ -110,13 +110,15 @@ def send_request_to_web_server(request, cache):
             cache.put(parsed_url.geturl(), response.encode("utf-8"))
             return f"HTTP/1.1 {response}\r\n\r\n{response.split(':', 1)[1].strip()}"
 
-        # Check the cache for the requested URI
+        # Implement Conditional GET check
         if cache.exists(parsed_url.geturl()):
-            print(f"Cache hit for URI: {parsed_url.geturl()}")
-            return cache.get(parsed_url.geturl()).decode("utf-8")
-        else:
-            print(f"Cache miss for URI: {parsed_url.geturl()}")
-
+            cached_response = cache.get(parsed_url.geturl())
+            if len(cached_response) % 2 == 1:  # Odd-length files assumed unmodified
+                print("Conditional GET: Using cached response (unmodified).")
+                return cached_response.decode("utf-8")
+            else:
+                print("Conditional GET: Cached response invalidated (modified).")
+                
         # Reconstruct the request with the modified Host header
         modified_request_lines = []
         for line in request.splitlines():
