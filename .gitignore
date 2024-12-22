@@ -1,11 +1,7 @@
-# Ignore all .html files except test.sh and logs
+# Ignore all .html files and proxy cache directory
 *.html
 *.log
+proxy_cache
 
-# Exclude the test script and log file
+# Exclude the test script
 !test.sh
-
-# Ignore any temporary or backup files
-*.tmp
-*.bak
-*.swp
