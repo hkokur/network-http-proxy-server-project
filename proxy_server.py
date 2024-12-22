@@ -1,5 +1,6 @@
 import socket
 import threading
+import signal
 
 # Check active IP addresses on your local machine by:
 # MacOS/Linux: ifconfig
@@ -8,6 +9,7 @@ HOST = "127.0.0.1"
 PORT = 8888  # Default port number
 WEB_SERVER_PORT = 8000
 
+signal.signal(signal.SIGTSTP, signal.SIG_IGN)
 
 def proxy_server():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
