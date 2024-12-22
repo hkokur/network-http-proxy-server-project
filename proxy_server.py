@@ -1,6 +1,7 @@
 import socket
 import threading
 import signal
+import argparse
 from urllib.parse import urlparse
 from cache import Cache
 
@@ -11,14 +12,11 @@ HOST = "127.0.0.1"
 PORT = 8888  # Default port number
 WEB_SERVER_PORT = 8082
 CACHE_DIR = "./proxy_cache"
-CACHE_SIZE = 5  # Maximum cache entries
-
 
 signal.signal(signal.SIGTSTP, signal.SIG_IGN)
 
-def proxy_server():
-
-    cache = Cache(CACHE_DIR, CACHE_SIZE) # Cache initialized for every instance
+def proxy_server(cache_size):
+    cache = Cache(CACHE_DIR, cache_size) # Cache initialized for every instance
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         try:
             server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -198,4 +196,13 @@ def send_request_to_server(request, host_line, client_socket):
                 print(f"Sending response for {host_name} to client: \n{data}\n\n")
 
 
-proxy_server()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run a simple HTTP proxy server.")
+    parser.add_argument(
+        "cache_size",
+        type=int,
+        help="Maximum number of entries in the cache (required)",
+    )
+    args = parser.parse_args()
+
+    proxy_server(args.cache_size)
