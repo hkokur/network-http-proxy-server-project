@@ -101,14 +101,16 @@ def send_request_to_web_server(request, cache):
     try:
         request_line = request.splitlines()[0]
         is_valid, response = parse_and_validate_uri(request_line)
-        if not is_valid:
-            return f"HTTP/1.1 {response}\r\n\r\n{response.split(':', 1)[1].strip()}"
 
         # Extract and adjust the Host header
         parsed_url = urlparse(request_line.split(" ")[1])  # Get the absolute URI
         web_server_host = parsed_url.hostname or "127.0.0.1"
         web_server_port = parsed_url.port or WEB_SERVER_PORT
         relative_path = parsed_url.path or "/"
+
+        if not is_valid:
+            cache.put(parsed_url.geturl(), response.encode("utf-8"))
+            return f"HTTP/1.1 {response}\r\n\r\n{response.split(':', 1)[1].strip()}"
 
         # Check the cache for the requested URI
         if cache.exists(parsed_url.geturl()):

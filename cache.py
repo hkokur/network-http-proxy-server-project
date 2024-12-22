@@ -11,6 +11,8 @@ class Cache:
 
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
+        else:
+            self.clear()
 
     def _get_cache_path(self, key):
         return os.path.join(self.cache_dir, key.replace("/", "_"))
@@ -44,3 +46,13 @@ class Cache:
             cache_path = self._get_cache_path(key)
             with open(cache_path, "wb") as f:
                 f.write(value)
+
+    def clear(self):
+        with self.lock:
+            for filename in os.listdir(self.cache_dir):
+                file_path = os.path.join(self.cache_dir, filename)
+                try:
+                    os.remove(file_path)
+                except Exception as e:
+                    print(f"Error removing cache file {file_path}: {e}")
+            self.cache.clear()
