@@ -1,4 +1,5 @@
 import socket
+import threading
 
 # Check active IP addresses on your local machine by:
 # MacOS/Linux: ifconfig
@@ -21,7 +22,10 @@ def proxy_server():
                 try:
                     client_socket, client_address = server_socket.accept()
                     print(f"Connection received from {client_address}")
-                    handle_client(client_socket)
+                    client_thread = threading.Thread(
+                        target=handle_client, args=(client_socket,)
+                    )
+                    client_thread.start()
                 except Exception as e:
                     print(f"Error during client handling: {e}")
 
@@ -38,17 +42,21 @@ def handle_client(client_socket):
         if not request:
             client_socket.close()
             return
+        print(f"Received request: \n{request}")
 
-        # parse the request
-        request_line = request.splitlines()[0]
-        is_valid, document_size = parse_and_validate_uri(request_line)
+        host_line = [
+            line
+            for line in request.splitlines()
+            if line.startswith("Host:") or line.startswith("host:")
+        ][0]
 
-        if is_valid:
-            response = send_request_to_server(request)
+        # Spliting the localhost request and other website requests
+        if "127.0.0.1" in host_line or "localhost" in host_line:
+            response = send_request_to_web_server(request)
+            print(f"Sending response to client: \n{response}\n\n")
+            client_socket.sendall(response.encode("utf-8"))
         else:
-            response = f"HTTP/1.1 {document_size}\r\n\r\n{document_size.split(':', 1)[1].strip()}"
-
-        client_socket.sendall(response.encode("utf-8"))
+            response = send_request_to_server(request, host_line, client_socket)
 
     except KeyboardInterrupt:
         print("\nShutting down the proxy server.")
@@ -83,16 +91,74 @@ def parse_and_validate_uri(request_line):
         return False, f"400 Bad Request: {str(e)}"
 
 
-def send_request_to_server(request):
+def send_request_to_web_server(request):
     try:
+        request_line = request.splitlines()[0]
+        is_valid, response = parse_and_validate_uri(request_line)
+        if not is_valid:
+            return f"HTTP/1.1 {response}\r\n\r\n{response.split(':', 1)[1].strip()}"
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+                server_socket.connect(("127.0.0.1", WEB_SERVER_PORT))
+                server_socket.sendall(request.encode("utf-8"))
+                response = server_socket.recv(1024).decode("utf-8")
+                return response
+        except ConnectionRefusedError:
+            return "HTTP/1.1 404 Not Found\r\n\r\nWeb server is not running"
+    except:
+        return "HTTP/1.1 400 Bad Request\r\n\r\nInvalid request"
+
+
+def send_request_to_server(request, host_line, client_socket):
+    # If HTTPS request get, then connect to the server
+    # If HTTP request get, then send the request to directly the server
+    host_name = host_line.split(":")[1].strip()
+    request_line = request.splitlines()[0]
+
+    if request_line.startswith("CONNECT"):  # HTTPS request
+        port = int(host_line.split(":")[2].strip())
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-            server_socket.connect(("127.0.0.1", WEB_SERVER_PORT))
+            server_socket.connect((host_name, port))
+            client_socket.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+
+            # Relay data between client and server
+            client_socket.setblocking(False)
+            server_socket.setblocking(False)
+
+            while True:
+                try:
+                    data = client_socket.recv(4096)
+                    if data:
+                        server_socket.sendall(data)
+                        print(
+                            f"Sending request for {host_name} to server: \n{data}\n\n"
+                        )
+                except BlockingIOError:
+                    pass
+
+                try:
+                    data = server_socket.recv(4096)
+                    if data:
+                        client_socket.sendall(data)
+                        print(
+                            f"Sending response for {host_name} to client: \n{data}\n\n"
+                        )
+                except BlockingIOError:
+                    pass
+    else:  # HTTP request
+        # Extract the host and port from the request
+        port = 80  # Default HTTP port
+        request = request.replace("http://", "", 1).replace(host_name, "", 1)
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+            server_socket.connect((host_name, port))
             server_socket.sendall(request.encode("utf-8"))
-            response = server_socket.recv(1024).decode("utf-8")
-            print(f"Received response from the web server: \n{response}")
-            return response
-    except ConnectionRefusedError:
-        return "HTTP/1.1 404 Not Found\r\n\r\nWeb server is not running"
+            while True:
+                data = server_socket.recv(4096)
+                if not data:
+                    break
+                client_socket.sendall(data)
+                print(f"Sending response for {host_name} to client: \n{data}\n\n")
 
 
 proxy_server()
