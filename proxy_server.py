@@ -15,8 +15,9 @@ CACHE_DIR = "./proxy_cache"
 
 signal.signal(signal.SIGTSTP, signal.SIG_IGN)
 
+
 def proxy_server(cache_size):
-    cache = Cache(CACHE_DIR, cache_size) # Cache initialized for every instance
+    cache = Cache(CACHE_DIR, cache_size)  # Cache initialized for every instance
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         try:
             server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -71,6 +72,7 @@ def handle_client(client_socket, cache):
     finally:
         client_socket.close()
 
+
 def parse_and_validate_uri(request_line):
     try:
         method, relative_url, http_version = request_line.split()
@@ -118,7 +120,7 @@ def send_request_to_web_server(request, cache):
                 return cached_response.decode("utf-8")
             else:
                 print("Conditional GET: Cached response invalidated (modified).")
-                
+
         # Reconstruct the request with the modified Host header
         modified_request_lines = []
         for line in request.splitlines():
@@ -144,7 +146,8 @@ def send_request_to_web_server(request, cache):
 
             return response
     except Exception as e:
-        return f"HTTP/1.1 500 Internal Server Error\r\n\r\n{str(e)}"
+        return "HTTP/1.1 404 Not Found\r\n\r\nWeb server is not running"
+
 
 def send_request_to_server(request, host_line, client_socket):
     # If HTTPS request get, then connect to the server
