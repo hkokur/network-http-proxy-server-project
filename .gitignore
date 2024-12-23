@@ -5,3 +5,6 @@ proxy_cache
 
 # Exclude the test script
 !test.sh
+
+
+__pycache__*
