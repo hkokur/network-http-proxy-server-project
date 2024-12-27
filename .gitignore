@@ -2,9 +2,10 @@
 *.html
 *.log
 proxy_cache
+venv
 
 # Exclude the test script
 !test.sh
-
+!wrk_test_results.log
 
 __pycache__*
