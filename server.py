@@ -15,11 +15,10 @@ PORT = args.port
 
 
 def handle_client(client_socket, address):
-    print(f"New connection from {address}")
-
     # Receive the request from the client
     try:
         request = client_socket.recv(1024).decode("utf-8")
+        print(f"Received request from {address}: \n{request}")
         if not request:
             client_socket.close()
             return
@@ -44,6 +43,7 @@ def handle_client(client_socket, address):
             response = f"HTTP/1.1 {result}\r\n\r\n{result.split(':', 1)[1].strip()}"
 
         # Send the response
+        print(f"Sending response to {address}: \n{response}")
         client_socket.sendall(response.encode("utf-8"))
     except Exception as e:
         print(f"Error handling client {address}: {e}")
@@ -55,7 +55,6 @@ def parse_and_validate_uri(request_line):
     try:
         # Get the URI
         parts = request_line.split()
-        print(parts)
 
         # Check if the URI format is valid
         if (
