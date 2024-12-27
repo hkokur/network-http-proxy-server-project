@@ -1,4 +1,5 @@
 import os
+import logging
 from collections import OrderedDict
 from threading import Lock
 
@@ -24,11 +25,12 @@ class Cache:
     def get(self, key):
         with self.lock:
             if key in self.cache:
-                # Move the accessed item to the end (LRU behavior)
+                logging.info(f"Cache hit for key: {key}")
                 self.cache.move_to_end(key)
                 cache_path = self._get_cache_path(key)
                 with open(cache_path, "rb") as f:
                     return f.read()
+            logging.info(f"Cache miss for key: {key}")
         return None
 
     def put(self, key, value):

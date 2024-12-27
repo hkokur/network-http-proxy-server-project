@@ -10,7 +10,7 @@ from cache import Cache
 # Windows: ipconfig
 HOST = "127.0.0.1"
 PORT = 8888  # Default port number
-WEB_SERVER_PORT = 8082
+WEB_SERVER_PORT = 8080
 CACHE_DIR = "./proxy_cache"
 
 signal.signal(signal.SIGTSTP, signal.SIG_IGN)
@@ -112,12 +112,13 @@ def send_request_to_web_server(request, cache):
             cache.put(parsed_url.geturl(), response.encode("utf-8"))
             return f"HTTP/1.1 {response}\r\n\r\n{response.split(':', 1)[1].strip()}"
 
-        # Implement Conditional GET check
+        # Inside the send_request_to_web_server function, in the Conditional GET check
         if cache.exists(parsed_url.geturl()):
             cached_response = cache.get(parsed_url.geturl())
-            if len(cached_response) % 2 == 1:  # Odd-length files assumed unmodified
+            cached_response_decoded = cached_response.decode("utf-8")  # Decode the cached response
+            if int(parsed_url.geturl().lstrip('/')) % 2 == 1:  # Odd-length files assumed unmodified
                 print("Conditional GET: Using cached response (unmodified).")
-                return cached_response.decode("utf-8")
+                return cached_response_decoded  # Return the decoded cached response
             else:
                 print("Conditional GET: Cached response invalidated (modified).")
 
