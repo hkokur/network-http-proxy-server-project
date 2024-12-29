@@ -1,0 +1,16 @@
+Performance Test Results (Proxy Server)
+======================================
+---------------------------------------
+Testing with 1 threads and 20 connections...
+Running 5s test @ http://127.0.0.1:8888/9997
+  1 threads and 20 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     0.00us    0.00us   0.00us     nan%
+    Req/Sec     0.00      0.00     0.00       nan%
+  0 requests in 5.04s, 15.79MB read
+  Socket errors: connect 0, read 16191, write 7, timeout 0
+Requests/sec:      0.00
+Transfer/sec:      3.13MB
+---------------------------------------
+---------------------------------------
+Testing with 1 threads and 40 connections...

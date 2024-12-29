@@ -1,7 +1,9 @@
 import socket
 import threading
 import signal
+import argparse
 from urllib.parse import urlparse
+from cache import Cache
 
 # Check active IP addresses on your local machine by:
 # MacOS/Linux: ifconfig
@@ -9,10 +11,13 @@ from urllib.parse import urlparse
 HOST = "127.0.0.1"
 PORT = 8888  # Default port number
 WEB_SERVER_PORT = 8080
+CACHE_DIR = "./proxy_cache"
 
 signal.signal(signal.SIGTSTP, signal.SIG_IGN)
 
-def proxy_server():
+
+def proxy_server(cache_size):
+    cache = Cache(CACHE_DIR, cache_size)  # Cache initialized for every instance
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         try:
             server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -26,7 +31,7 @@ def proxy_server():
                     client_socket, client_address = server_socket.accept()
                     print(f"Connection received from {client_address}")
                     client_thread = threading.Thread(
-                        target=handle_client, args=(client_socket,)
+                        target=handle_client, args=(client_socket, cache)
                     )
                     client_thread.start()
                 except Exception as e:
@@ -38,7 +43,7 @@ def proxy_server():
             print(f"Error: {e}")
 
 
-def handle_client(client_socket):
+def handle_client(client_socket, cache):
     try:
         # Receive the request from the client
         request = client_socket.recv(1024).decode("utf-8")
@@ -53,19 +58,17 @@ def handle_client(client_socket):
             if line.startswith("Host:") or line.startswith("host:")
         ][0]
 
-        # Spliting the localhost request and other website requests
         if "127.0.0.1" in host_line or "localhost" in host_line:
-            response = send_request_to_web_server(request)
+            response = send_request_to_web_server(request, cache)
             print(f"Sending response to client: \n{response}\n\n")
             client_socket.sendall(response.encode("utf-8"))
         else:
-            response = send_request_to_server(request, host_line, client_socket)
+            send_request_to_server(request, host_line, client_socket)
 
-    except KeyboardInterrupt:
-        print("\nShutting down the proxy server.")
     except Exception as e:
         print(f"Error handling client: {e}")
-
+        error_response = f"HTTP/1.1 500 Internal Server Error\r\n\r\n{str(e)}"
+        client_socket.sendall(error_response.encode("utf-8"))
     finally:
         client_socket.close()
 
@@ -94,41 +97,57 @@ def parse_and_validate_uri(request_line):
         return False, f"400 Bad Request: {str(e)}"
 
 
-def send_request_to_web_server(request):
+def send_request_to_web_server(request, cache):
     try:
         request_line = request.splitlines()[0]
         is_valid, response = parse_and_validate_uri(request_line)
-        if not is_valid:
-            return f"HTTP/1.1 {response}\r\n\r\n{response.split(':', 1)[1].strip()}"
-        
+
         # Extract and adjust the Host header
-        parsed_url = urlparse(request_line.split(' ')[1])  # Get the absolute URI from the request line
+        parsed_url = urlparse(request_line.split(" ")[1])  # Get the absolute URI
         web_server_host = parsed_url.hostname or "127.0.0.1"
         web_server_port = parsed_url.port or WEB_SERVER_PORT
         relative_path = parsed_url.path or "/"
+
+        if not is_valid:
+            cache.put(parsed_url.geturl(), response.encode("utf-8"))
+            return f"HTTP/1.1 {response}\r\n\r\n{response.split(':', 1)[1].strip()}"
+
+        # Inside the send_request_to_web_server function, in the Conditional GET check
+        if cache.exists(parsed_url.geturl()):
+            cached_response = cache.get(parsed_url.geturl())
+            cached_response_decoded = cached_response.decode("utf-8")  # Decode the cached response
+            if int(parsed_url.geturl().lstrip('/')) % 2 == 1:  # Odd-length files assumed unmodified
+                print("Conditional GET: Using cached response (unmodified).")
+                return cached_response_decoded  # Return the decoded cached response
+            else:
+                print("Conditional GET: Cached response invalidated (modified).")
 
         # Reconstruct the request with the modified Host header
         modified_request_lines = []
         for line in request.splitlines():
             if line.lower().startswith("host:"):
-                modified_request_lines.append(f"Host: {web_server_host}:{web_server_port}")
+                modified_request_lines.append(
+                    f"Host: {web_server_host}:{web_server_port}"
+                )
             elif line == request_line:
-                # Replace absolute URI with relative path in the request line
-                modified_request_lines.append(f"{request_line.split(' ')[0]} {relative_path} {request_line.split(' ')[2]}")
+                modified_request_lines.append(
+                    f"{request_line.split(' ')[0]} {relative_path} {request_line.split(' ')[2]}"
+                )
             else:
                 modified_request_lines.append(line)
         modified_request = "\r\n".join(modified_request_lines) + "\r\n\r\n"
 
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-                server_socket.connect(("127.0.0.1", WEB_SERVER_PORT))
-                server_socket.sendall(modified_request.encode("utf-8"))
-                response = server_socket.recv(1024).decode("utf-8")
-                return response
-        except ConnectionRefusedError:
-            return "HTTP/1.1 404 Not Found\r\n\r\nWeb server is not running"
-    except:
-        return "HTTP/1.1 400 Bad Request\r\n\r\nInvalid request"
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+            server_socket.connect(("127.0.0.1", WEB_SERVER_PORT))
+            server_socket.sendall(modified_request.encode("utf-8"))
+            response = server_socket.recv(1024).decode("utf-8")
+
+            # Cache the response
+            cache.put(parsed_url.geturl(), response.encode("utf-8"))
+
+            return response
+    except Exception as e:
+        return "HTTP/1.1 404 Not Found\r\n\r\nWeb server is not running"
 
 
 def send_request_to_server(request, host_line, client_socket):
@@ -183,4 +202,13 @@ def send_request_to_server(request, host_line, client_socket):
                 print(f"Sending response for {host_name} to client: \n{data}\n\n")
 
 
-proxy_server()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run a simple HTTP proxy server.")
+    parser.add_argument(
+        "cache_size",
+        type=int,
+        help="Maximum number of entries in the cache (required)",
+    )
+    args = parser.parse_args()
+
+    proxy_server(args.cache_size)

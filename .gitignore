@@ -1,11 +1,10 @@
-# Ignore all .html files except test.sh and logs
+# Ignore all .html files and proxy cache directory
 *.html
-*.log
+proxy_cache
+venv
 
-# Exclude the test script and log file
+# Exclude the test script
 !test.sh
+# !wrk_test_results.log
 
-# Ignore any temporary or backup files
-*.tmp
-*.bak
-*.swp
+__pycache__*

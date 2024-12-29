@@ -1,4 +1,5 @@
 import socket, threading, argparse
+import concurrent.futures  # Added import
 
 # Check active IP addresses on your local machine by:
 # MacOS/Linux: ifconfig
@@ -7,12 +8,23 @@ HOST = "127.0.0.1"
 PORT = 8080  # Default port number
 BASE_SENTENCE = "Hello,World!"
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument("port", type=int, help="Port number")
 args = parser.parse_args()
 PORT = args.port
 
+# Define a set of standard HTTP methods
+STANDARD_HTTP_METHODS = {
+    "GET",
+    "HEAD",
+    "POST",
+    "PUT",
+    "DELETE",
+    "CONNECT",
+    "OPTIONS",
+    "TRACE",
+    "PATCH"
+}
 
 def handle_client(client_socket, address):
     # Receive the request from the client
@@ -69,9 +81,14 @@ def parse_and_validate_uri(request_line):
         if not (100 <= document_size <= 20000):
             return False, "400 Bad Request: Size out of range"
 
+        # Check if the method is a standard HTTP method
+        # curl -v -X FOO http://localhost:8080/500
+        if parts[0] not in STANDARD_HTTP_METHODS:
+            return False, "400 Bad Request: Invalid HTTP method"
+
         # check the GET method
         if parts[0] != "GET":
-            return False, "510 Not Implemented: Only GET method is supported"
+            return False, "501 Not Implemented: Only GET method is supported"
 
         # If valid, return the size
         return True, document_size
@@ -101,15 +118,26 @@ def generate_html_page(document_size):
     return response_html
 
 
+# Define the number of worker threads in the thread pool
+MAX_WORKERS = 50  # You can adjust this number based on your needs
+
+# Initialize the ThreadPoolExecutor
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
+
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind((HOST, PORT))
 server_socket.listen()
 
 print(f"Server listening on {HOST}:{PORT}")
 
-while True:
-    client_socket, client_address = server_socket.accept()
-    thread = threading.Thread(
-        target=handle_client, args=(client_socket, client_address)
-    )
-    thread.start()
+try:
+    while True:
+        client_socket, client_address = server_socket.accept()
+        # Submit the handle_client task to the thread pool
+        executor.submit(handle_client, client_socket, client_address)
+except KeyboardInterrupt:
+    print("\nShutting down the server gracefully...")
+finally:
+    server_socket.close()
+    executor.shutdown(wait=True)
+    print("Server has been shut down.")
