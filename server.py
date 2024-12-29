@@ -1,4 +1,14 @@
 import socket, threading, argparse
+import queue  # Added import
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(threadName)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("./test/server.log", mode='a'),  # Append mode
+    ]
+)
 
 # Check active IP addresses on your local machine by:
 # MacOS/Linux: ifconfig
@@ -7,7 +17,6 @@ HOST = "127.0.0.1"
 PORT = 8080  # Default port number
 BASE_SENTENCE = "Hello,World!"
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument("port", type=int, help="Port number")
 args = parser.parse_args()
@@ -15,7 +24,6 @@ PORT = args.port
 
 
 def handle_client(client_socket, address):
-    # Receive the request from the client
     try:
         request = client_socket.recv(1024).decode("utf-8")
         print(f"Received request from {address}: \n{request}")
@@ -36,20 +44,22 @@ def handle_client(client_socket, address):
                 f"HTTP/1.1 200 OK\r\n"
                 f"Content-Type: text/html\r\n"
                 f"Content-Length: {document_size}\r\n"
+                f"Connection: close\r\n"  # Ensure connection is closed
                 f"\r\n"
                 f"{html_content}"
             )
         else:
-            response = f"HTTP/1.1 {result}\r\n\r\n{result.split(':', 1)[1].strip()}"
+            response = f"HTTP/1.1 {result}\r\nConnection: close\r\n\r\n{result.split(':', 1)[1].strip()}"
 
         # Send the response
         print(f"Sending response to {address}: \n{response}")
         client_socket.sendall(response.encode("utf-8"))
+    except ConnectionResetError as cre:
+        print(f"Connection reset by client {address}: {cre}")
     except Exception as e:
         print(f"Error handling client {address}: {e}")
     finally:
         client_socket.close()
-
 
 def parse_and_validate_uri(request_line):
     try:
@@ -101,15 +111,53 @@ def generate_html_page(document_size):
     return response_html
 
 
+# Define the number of worker threads in the thread pool
+NUM_WORKERS = 50  # You can adjust this number based on your needs
+
+# Create a queue to hold incoming client connections
+task_queue = queue.Queue()
+
+def worker():
+    thread_name = threading.current_thread().name
+    while True:
+        client_socket, client_address = task_queue.get()
+        if client_socket is None:
+            logging.info(f"{thread_name} received shutdown signal.")
+            break
+        logging.info(f"{thread_name} handling connection from {client_address}")
+        handle_client(client_socket, client_address)
+        logging.info(f"{thread_name} finished handling connection from {client_address}")
+        task_queue.task_done()
+
+# Start worker threads
+threads = []
+for _ in range(NUM_WORKERS):
+    thread = threading.Thread(target=worker)
+    thread.daemon = True  # Allows threads to exit when the main thread does
+    thread.start()
+    threads.append(thread)
+
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind((HOST, PORT))
 server_socket.listen()
 
 print(f"Server listening on {HOST}:{PORT}")
 
-while True:
-    client_socket, client_address = server_socket.accept()
-    thread = threading.Thread(
-        target=handle_client, args=(client_socket, client_address)
-    )
-    thread.start()
+try:
+    while True:
+        client_socket, client_address = server_socket.accept()
+        # Enqueue the client connection for the worker threads to handle
+        task_queue.put((client_socket, client_address))
+except KeyboardInterrupt:
+    print("\nShutting down the server gracefully...")
+finally:
+    server_socket.close()
+    # Stop all worker threads by sending None as a signal
+    for _ in range(NUM_WORKERS):
+        task_queue.put((None, None))
+    # Wait for all tasks in the queue to be processed
+    task_queue.join()
+    # Wait for all worker threads to finish
+    for thread in threads:
+        thread.join()
+    print("Server has been shut down.")
