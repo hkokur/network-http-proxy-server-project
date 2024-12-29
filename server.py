@@ -7,6 +7,7 @@ import concurrent.futures  # Added import
 HOST = "127.0.0.1"
 PORT = 8080  # Default port number
 BASE_SENTENCE = "Hello,World!"
+MAX_WORKERS = 50  
 
 parser = argparse.ArgumentParser()
 parser.add_argument("port", type=int, help="Port number")
@@ -98,6 +99,7 @@ def parse_and_validate_uri(request_line):
 
 
 def generate_html_page(document_size):
+    # Fixed HTML structure
     head = f"<HEAD><TITLE>I am {document_size} bytes long</TITLE></HEAD>"
     body_start = "<BODY>"
     body_end = "</BODY>"
@@ -117,13 +119,10 @@ def generate_html_page(document_size):
     # print(f"Generated HTML page of size {len(response_html)} bytes")
     return response_html
 
-
-# Define the number of worker threads in the thread pool
-MAX_WORKERS = 50  # You can adjust this number based on your needs
-
-# Initialize the ThreadPoolExecutor
+# Initialize the Thread Pool
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
+# Set up the server socket
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind((HOST, PORT))
 server_socket.listen()
@@ -132,12 +131,14 @@ print(f"Server listening on {HOST}:{PORT}")
 
 try:
     while True:
+        # Accept an incoming client connection
         client_socket, client_address = server_socket.accept()
         # Submit the handle_client task to the thread pool
         executor.submit(handle_client, client_socket, client_address)
 except KeyboardInterrupt:
     print("\nShutting down the server gracefully...")
 finally:
+    # Clean up resources
     server_socket.close()
     executor.shutdown(wait=True)
     print("Server has been shut down.")
