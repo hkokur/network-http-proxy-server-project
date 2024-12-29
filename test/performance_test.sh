@@ -3,8 +3,8 @@
 # Define test parameters
 URL="http://127.0.0.1:8080/19999"
 DURATION="5s"
-THREADS=(4 8)  # Number of threads to test
-CONNECTIONS=($(seq 20 20 1000))  # Number of connections to test
+THREADS=(20)  # Number of threads to test
+CONNECTIONS=($(seq 1000 100 10000))  # Number of connections to test
 
 # Output log file
 OUTPUT_FILE="wrk_test_results.log"
