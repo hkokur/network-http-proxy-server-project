@@ -1,14 +1,6 @@
 import socket, threading, argparse
-import queue  # Added import
+import queue
 import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(threadName)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("./test/server.log", mode='a'),  # Append mode
-    ]
-)
 
 # Check active IP addresses on your local machine by:
 # MacOS/Linux: ifconfig
@@ -16,12 +8,20 @@ logging.basicConfig(
 HOST = "127.0.0.1"
 PORT = 8080  # Default port number
 BASE_SENTENCE = "Hello,World!"
+NUM_WORKERS = 50  
 
 parser = argparse.ArgumentParser()
 parser.add_argument("port", type=int, help="Port number")
 args = parser.parse_args()
 PORT = args.port
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(threadName)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("./test/server.log", mode='a'),
+    ]
+)
 
 def handle_client(client_socket, address):
     try:
@@ -44,12 +44,9 @@ def handle_client(client_socket, address):
                 f"HTTP/1.1 200 OK\r\n"
                 f"Content-Type: text/html\r\n"
                 f"Content-Length: {document_size}\r\n"
-                f"Connection: close\r\n"  # Ensure connection is closed
                 f"\r\n"
                 f"{html_content}"
             )
-        else:
-            response = f"HTTP/1.1 {result}\r\nConnection: close\r\n\r\n{result.split(':', 1)[1].strip()}"
 
         # Send the response
         print(f"Sending response to {address}: \n{response}")
@@ -63,7 +60,6 @@ def handle_client(client_socket, address):
 
 def parse_and_validate_uri(request_line):
     try:
-        # Get the URI
         parts = request_line.split()
 
         # Check if the URI format is valid
@@ -111,10 +107,7 @@ def generate_html_page(document_size):
     return response_html
 
 
-# Define the number of worker threads in the thread pool
-NUM_WORKERS = 50  # You can adjust this number based on your needs
 
-# Create a queue to hold incoming client connections
 task_queue = queue.Queue()
 
 def worker():
