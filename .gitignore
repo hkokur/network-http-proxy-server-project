@@ -1,6 +1,5 @@
 # Ignore all .html files and proxy cache directory
 *.html
-*.log
 proxy_cache
 venv
 

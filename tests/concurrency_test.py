@@ -9,7 +9,7 @@ from datetime import datetime
 
 # Configure logging to write only to a file
 logging.basicConfig(
-    filename='concurrency_test.log',
+    filename='../test_outputs/concurrency_test.log',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )

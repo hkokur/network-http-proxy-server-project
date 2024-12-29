@@ -1,10 +1,12 @@
+#!/usr/bin/env python3
+
 import re
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colormaps
 
 # Define the log file
-log_file = "wrk_test_results.log"
+log_file = "../test_outputs/wrk_test_results.log"
 
 # Initialize data storage
 threads = []
@@ -91,6 +93,10 @@ plt.ylabel("Latency (ms)")
 plt.grid(True, linestyle="--", alpha=0.6)
 plt.legend()
 plt.tight_layout()
+
+# Save the Latency vs Connections plot to a file
+plt.savefig("../test_outputs/latency_vs_connections.png")  # Added line to save the plot
+
 plt.show()
 
 # Plot Throughput vs Connections
@@ -119,4 +125,8 @@ plt.ylabel("Requests/sec")
 plt.grid(True, linestyle="--", alpha=0.6)
 plt.legend()
 plt.tight_layout()
+
+# Save the Throughput vs Connections plot to a file
+plt.savefig("../test_outputs/throughput_vs_connections.png")  # Added line to save the plot
+
 plt.show()

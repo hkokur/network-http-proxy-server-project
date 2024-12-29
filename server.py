@@ -19,7 +19,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(threadName)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("./tests/server.log", mode='a'),
+        logging.FileHandler("./test_outputs/server.log", mode='a'),
     ]
 )
 
