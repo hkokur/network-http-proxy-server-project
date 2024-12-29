@@ -102,47 +102,45 @@ def send_request_to_web_server(request, cache):
         request_line = request.splitlines()[0]
         is_valid, response = parse_and_validate_uri(request_line)
 
-        # Extract and adjust the Host header
-        parsed_url = urlparse(request_line.split(" ")[1])  # Get the absolute URI
+        parsed_url = urlparse(request_line.split(" ")[1])
         web_server_host = parsed_url.hostname or "127.0.0.1"
         web_server_port = parsed_url.port or WEB_SERVER_PORT
         relative_path = parsed_url.path or "/"
 
         if not is_valid:
-            cache.put(parsed_url.geturl(), response.encode("utf-8"))
+            cache.put(parsed_url.geturl(), response.encode("utf-8"))  # Cache the error response
             return f"HTTP/1.1 {response}\r\n\r\n{response.split(':', 1)[1].strip()}"
 
-        # Inside the send_request_to_web_server function, in the Conditional GET check
+        # Conditional GET: Check if cached response exists and is unmodified
         if cache.exists(parsed_url.geturl()):
-            cached_response = cache.get(parsed_url.geturl())
-            cached_response_decoded = cached_response.decode("utf-8")  # Decode the cached response
-            if int(parsed_url.geturl().lstrip('/')) % 2 == 1:  # Odd-length files assumed unmodified
+            cached_response = cache.get(parsed_url.geturl())  # Retrieve cached response
+            cached_response_decoded = cached_response.decode("utf-8")
+            if int(parsed_url.geturl().lstrip('/')) % 2 == 1:  # Determine if content is unmodified
                 print("Conditional GET: Using cached response (unmodified).")
-                return cached_response_decoded  # Return the decoded cached response
+                return cached_response_decoded  # Serve cached response
             else:
                 print("Conditional GET: Cached response invalidated (modified).")
 
-        # Reconstruct the request with the modified Host header
+        # Modify the request to use relative URI and correct Host header
         modified_request_lines = []
         for line in request.splitlines():
             if line.lower().startswith("host:"):
                 modified_request_lines.append(
                     f"Host: {web_server_host}:{web_server_port}"
-                )
+                )  # Update Host header
             elif line == request_line:
                 modified_request_lines.append(
                     f"{request_line.split(' ')[0]} {relative_path} {request_line.split(' ')[2]}"
-                )
+                )  # Use relative path in request line
             else:
-                modified_request_lines.append(line)
-        modified_request = "\r\n".join(modified_request_lines) + "\r\n\r\n"
+                modified_request_lines.append(line)  # Keep other headers unchanged
+        modified_request = "\r\n".join([modified_request_lines]) + "\r\n\r\n"
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
             server_socket.connect(("127.0.0.1", WEB_SERVER_PORT))
             server_socket.sendall(modified_request.encode("utf-8"))
             response = server_socket.recv(1024).decode("utf-8")
 
-            # Cache the response
             cache.put(parsed_url.geturl(), response.encode("utf-8"))
 
             return response
