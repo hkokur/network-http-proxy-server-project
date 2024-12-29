@@ -13,6 +13,18 @@ parser.add_argument("port", type=int, help="Port number")
 args = parser.parse_args()
 PORT = args.port
 
+# Define a set of standard HTTP methods
+STANDARD_HTTP_METHODS = {
+    "GET",
+    "HEAD",
+    "POST",
+    "PUT",
+    "DELETE",
+    "CONNECT",
+    "OPTIONS",
+    "TRACE",
+    "PATCH"
+}
 
 def handle_client(client_socket, address):
     # Receive the request from the client
@@ -69,9 +81,14 @@ def parse_and_validate_uri(request_line):
         if not (100 <= document_size <= 20000):
             return False, "400 Bad Request: Size out of range"
 
+        # Check if the method is a standard HTTP method
+        # curl -v -X FOO http://localhost:8080/500
+        if parts[0] not in STANDARD_HTTP_METHODS:
+            return False, "400 Bad Request: Invalid HTTP method"
+
         # check the GET method
         if parts[0] != "GET":
-            return False, "510 Not Implemented: Only GET method is supported"
+            return False, "501 Not Implemented: Only GET method is supported"
 
         # If valid, return the size
         return True, document_size
